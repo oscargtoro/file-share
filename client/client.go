@@ -63,7 +63,6 @@ func send(path string) {
 	fmt.Println(string(response))
 }
 
-//
 func main() {
 	if len(os.Args) < 3 {
 		fmt.Println("Not enough arguments")
