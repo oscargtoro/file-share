@@ -55,7 +55,7 @@ func send(path string) {
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	rsp, err := client.Do(req)
 	if err != nil {
-		fmt.Println("Could not connect to server")
+		fmt.Println(err)
 		return
 	}
 
