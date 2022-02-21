@@ -13,20 +13,17 @@ const (
 	PORT = "8080"
 )
 
-func start(channels map[string][]string) {
+func start(channels map[string]map[string]string) {
 
 	// handler function for /join, logic for when channel registration is issued
 	joinHandler := func(w http.ResponseWriter, r *http.Request) {
 		channel := r.FormValue("name")
 		log.Println("Request to join channel " + channel + " recieved...")
 		if _, ok := channels[channel]; !ok {
-			channels[channel] = append(channels[channel], r.FormValue("host"))
-			channels[channel] = append(channels[channel], r.FormValue("port"))
+			channels[channel] = make(map[string]string)
+			channels[channel]["host"] = r.FormValue("host")
+			channels[channel]["port"] = r.FormValue("port")
 		}
-		/* client := new(strings.Builder)
-		log.Fprint(client, clientPort)
-		log.Println(clientPort)
-		clients[string(clientPort)] = name */
 		io.WriteString(w, "Registered in channel "+channel)
 		log.Println(channels)
 	}
@@ -66,7 +63,7 @@ func start(channels map[string][]string) {
 }
 
 func main() {
-	channels := make(map[string][]string)
+	channels := make(map[string]map[string]string)
 	if len(os.Args) == 1 {
 		fmt.Println("Not enough arguments")
 		os.Exit(0)
