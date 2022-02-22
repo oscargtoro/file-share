@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -19,7 +20,7 @@ const (
 
 // Send creates a buffer for the body, then using that buffer creates a multipart
 // writer where the file will be loaded then sent in a request.
-func send(path string) {
+func send(path, channel string) {
 
 	client := &http.Client{
 		Timeout: time.Second * 10,
@@ -27,7 +28,17 @@ func send(path string) {
 
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
-	fw, err := writer.CreateFormFile("file", path)
+	fw, err := writer.CreateFormField("channel")
+	if err != nil {
+		fmt.Println(err)
+	}
+	_, err = io.Copy(fw, strings.NewReader(channel))
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fw, err = writer.CreateFormFile("file", path)
 	if err != nil {
 		fmt.Println("Error openning the file " + path)
 		return
@@ -77,12 +88,20 @@ func join(channel string) {
 		"host": {HOST},
 		"port": {PORT},
 	}
+
 	res, err := http.PostForm("http://localhost:8080/join", data)
 	if err != nil {
 		fmt.Println("Could not connect to http://localhost:8080")
 	}
+
 	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		fmt.Println(err)
+	}
+	res.Body.Close()
 	fmt.Println(string(body))
+
+	// function handler, receive file shared in joined channel.
 	sendHandler := func(w http.ResponseWriter, r *http.Request) {
 		err := r.ParseMultipartForm(32 << 20) // Max 32MB
 		if err != nil {
@@ -95,36 +114,47 @@ func join(channel string) {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
+
 		tmpfile, err := os.Create("./" + fHeader.Filename)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		defer tmpfile.Close()
-		_, err = io.Copy(tmpfile, file)
 
+		_, err = io.Copy(tmpfile, file)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+
 		w.Write([]byte("File Recieved"))
 	}
+
 	http.HandleFunc("/send", sendHandler)
 	log.Println("Listening on port " + PORT)
 	log.Fatal(http.ListenAndServe(":"+PORT, nil))
 }
 
 func main() {
-	if len(os.Args) < 3 {
+	if len(os.Args) < 2 {
 		fmt.Println("Not enough arguments")
 		os.Exit(0)
 	}
 	if os.Args[1] == "send" {
-		send(os.Args[2])
-		os.Exit(0)
+		if len(os.Args[1:]) < 3 {
+			fmt.Println("Usage: send <filepath> <channel>")
+			return
+		}
+		send(os.Args[2], os.Args[3])
+		return
 	}
 	if os.Args[1] == "join" {
+		if len(os.Args[1:]) < 2 {
+			fmt.Println("Usage: join <channel>")
+			return
+		}
 		join(os.Args[2])
-		os.Exit(0)
+		return
 	}
 }
