@@ -21,7 +21,6 @@ const (
 // Send creates a buffer for the body, then using that buffer creates a multipart
 // writer where the file will be loaded then sent in a request.
 func send(path, channel string) {
-
 	client := &http.Client{
 		Timeout: time.Second * 10,
 	}
@@ -92,11 +91,13 @@ func join(channel string) {
 	res, err := http.PostForm("http://localhost:8080/join", data)
 	if err != nil {
 		fmt.Println("Could not connect to http://localhost:8080")
+		return
 	}
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		fmt.Println(err)
+		return
 	}
 	res.Body.Close()
 	fmt.Println(string(body))
