@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"os"
+	"time"
 )
 
 const (
@@ -25,12 +28,20 @@ func start(channels map[string]map[string]string) {
 			channels[channel]["port"] = r.FormValue("port")
 		}
 		io.WriteString(w, "Registered in channel "+channel)
-		log.Println(channels)
 	}
 
 	// handler function for /send, logic for when a file share request is issued
 	sendHandler := func(w http.ResponseWriter, r *http.Request) {
-		err := r.ParseMultipartForm(32 << 20) // Max 32MB
+		// Limits body to a size of 32MB this way it will only use the 32MB limit on mem used bellow
+		r.Body = http.MaxBytesReader(w, r.Body, 32<<20)
+		client := &http.Client{
+			Timeout: time.Second * 10,
+		}
+		body := &bytes.Buffer{}
+		writer := multipart.NewWriter(body)
+
+		//Limits use of memory to 32.5MB
+		err := r.ParseMultipartForm(32<<20 + 512) // Max 32MB
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			return
@@ -41,19 +52,47 @@ func start(channels map[string]map[string]string) {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		tmpfile, err := os.Create("./" + fHeader.Filename)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		defer tmpfile.Close()
-		_, err = io.Copy(tmpfile, file)
 
+		fw, err := writer.CreateFormFile("file", "./"+fHeader.Filename)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
+			log.Println(err)
 			return
 		}
-		w.Write([]byte("File Recieved"))
+
+		_, err = io.Copy(fw, file)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		writer.Close()
+
+		channel := r.FormValue("channel")
+
+		if _, ok := channels[channel]; ok {
+			for _, v := range channels {
+				req, err := http.NewRequest("POST", fmt.Sprintf("http://%s:%s/send", v["host"], v["port"]), bytes.NewReader(body.Bytes()))
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+				fmt.Println(writer.FormDataContentType())
+				req.Header.Set("Content-Type", writer.FormDataContentType())
+				rsp, err := client.Do(req)
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+				defer rsp.Body.Close()
+				if rsp.StatusCode != http.StatusOK {
+					log.Printf("Request failed with response code: %d", rsp.StatusCode)
+					return
+				}
+				response, _ := io.ReadAll(rsp.Body)
+				fmt.Println(string(response) + "Host" + v["host"])
+			}
+		}
+
+		w.Write([]byte("File sent"))
 	}
 
 	http.HandleFunc("/join", joinHandler)
