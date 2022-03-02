@@ -1,19 +1,19 @@
 # file-share
-This repository contains my take on a simple file share between clients, there is the server that takes requests to share a file and a client side that can send files to channels and recieve files once they have registered to one.
+This repository contains my take on a simple file share between clients, there is the server that takes requests to share a file and a client side that can send files to channels and recieve files once they have joined one.
 
 # Client
 This Go programm can subscribe to channels to receive files and send files to an specific channel (right now can't send files to more than 1 channel).
 
 ## Usage
 ```
-go run ./client.go send <channel>
-go run ./client.go register <channel>
+go run ./client.go send <file> <channel>
+go run ./client.go join <channel>
 ```
 
 The channel can be any string (must not contain spaces)
 
 # Server
-This go programm manages the channels created when a register request is issued, the files sent to the channels must not surpass a size of 32MB.
+This go programm manages the channels created when a join request is issued, the files sent to the channels must not surpass a size of 32MB.
 
 ## Usage
 ```
